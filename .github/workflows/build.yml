@@ -1,0 +1,136 @@
+name: Build and Release Fortune Deb
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Checkout sentences-bundle
+        uses: actions/checkout@v4
+        with:
+          repository: hitokoto-osc/sentences-bundle
+          ref: master
+          path: sentences-bundle
+          sparse-checkout: |
+            sentences
+            categories.json
+            version.json
+
+      - name: Read bundle version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('sentences-bundle/version.json'))['bundle_version'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install fortune tools
+        run: sudo apt-get install -y fortune-mod
+
+      - name: Convert to fortune format
+        run: |
+          python3 scripts/convert.py sentences-bundle/sentences fortunes
+
+      - name: Generate .dat files with strfile
+        run: |
+          for f in fortunes/hitokoto*; do
+            if [[ "$f" != *.dat ]]; then
+              strfile "$f" "${f}.dat"
+            fi
+          done
+
+      - name: Build deb package
+        id: deb
+        run: |
+          BUNDLE_VER="${{ steps.version.outputs.version }}"
+          DEB_VER="${BUNDLE_VER}"
+          ARCH=all
+          PKG_NAME=fortune-hitokoto
+          PKG_DIR="${PKG_NAME}_${DEB_VER}_${ARCH}"
+
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/usr/share/games/fortunes"
+
+          cp fortunes/hitokoto* "${PKG_DIR}/usr/share/games/fortunes/"
+
+          cat > "${PKG_DIR}/DEBIAN/control" << EOF
+          Package: ${PKG_NAME}
+          Version: ${DEB_VER}
+          Section: games
+          Priority: optional
+          Architecture: ${ARCH}
+          Depends: fortune-mod
+          Maintainer: hitokoto-fortune <noreply@github.com>
+          Description: Hitokoto (一言) fortune database files
+           Fortune data files generated from the hitokoto-osc/sentences-bundle.
+           Contains Chinese quotes from anime, literature, poetry, and more.
+           Install and run 'fortune hitokoto' to get a random quote.
+          EOF
+
+          dpkg-deb --build "${PKG_DIR}"
+
+          DEB_FILE="${PKG_DIR}.deb"
+          echo "deb_file=$DEB_FILE" >> "$GITHUB_OUTPUT"
+          echo "pkg_dir=$PKG_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Compute checksums
+        id: checksums
+        run: |
+          DEB_FILE="${{ steps.deb.outputs.deb_file }}"
+          SHA256=$(sha256sum "$DEB_FILE" | cut -d' ' -f1)
+          SIZE=$(stat --format=%s "$DEB_FILE")
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Count sentences
+        id: count
+        run: |
+          TOTAL=$(grep -c '^%$' fortunes/hitokoto)
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.version.outputs.version }}"
+          name: "fortune-hitokoto v${{ steps.version.outputs.version }}"
+          body: |
+            ## fortune-hitokoto v${{ steps.version.outputs.version }}
+
+            Fortune database generated from [hitokoto-osc/sentences-bundle](https://github.com/hitokoto-osc/sentences-bundle) `v${{ steps.version.outputs.version }}`.
+
+            **Total sentences: ${{ steps.count.outputs.total }}**
+
+            Categories: 动画, 漫画, 游戏, 文学, 原创, 网络, 其他, 影视, 诗词, 网易云, 哲学, 搞笑
+
+            ### Install
+
+            ```bash
+            sudo dpkg -i fortune-hitokoto_${{ steps.version.outputs.version }}_all.deb
+            fortune hitokoto
+            ```
+
+            Or per category:
+            ```bash
+            fortune hitokoto-a   # 动画
+            fortune hitokoto-d   # 文学
+            fortune hitokoto-i   # 诗词
+            ```
+
+            ### checksums
+            - SHA256: `${{ steps.checksums.outputs.sha256 }}`
+            - Size: `${{ steps.checksums.outputs.size }}` bytes
+          files: |
+            ${{ steps.deb.outputs.deb_file }}
+          fail_on_unmatched_files: true
