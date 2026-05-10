@@ -19,6 +19,26 @@ CATEGORIES = {
     "l": "搞笑",
 }
 
+YELLOW = "\033[33m"
+GREEN = "\033[32m"
+RESET = "\033[0m"
+
+
+def colorize_book_titles(text):
+    """Colorize 《》 with green, matching fortune-zh convention."""
+    result = []
+    i = 0
+    while i < len(text):
+        if text[i] == "《":
+            result.append(f"{GREEN}《")
+        elif text[i] == "》":
+            result.append(f"》{RESET}")
+        else:
+            result.append(text[i])
+        i += 1
+    return "".join(result)
+
+
 def convert_json_to_fortune(json_path, fortune_path):
     with open(json_path, "r", encoding="utf-8") as f:
         sentences = json.load(f)
@@ -29,9 +49,9 @@ def convert_json_to_fortune(json_path, fortune_path):
         source = item.get("from", "").strip()
         if not text:
             continue
-        lines.append(text)
+        lines.append(colorize_book_titles(text))
         if source:
-            lines.append(f"    -- {source}")
+            lines.append(f"\t\t{YELLOW}-- {source}{RESET}")
         lines.append("%")
 
     if lines:
@@ -68,13 +88,13 @@ def main():
             source = item.get("from", "").strip()
             if not text:
                 continue
-            lines.append(text)
+            lines.append(colorize_book_titles(text))
             if source:
-                lines.append(f"    -- {source}")
+                lines.append(f"\t\t{YELLOW}-- {source}{RESET}")
             lines.append("%")
-            all_lines.append(text)
+            all_lines.append(colorize_book_titles(text))
             if source:
-                all_lines.append(f"    -- {source}")
+                all_lines.append(f"\t\t{YELLOW}-- {source}{RESET}")
             all_lines.append("%")
 
         if lines:
