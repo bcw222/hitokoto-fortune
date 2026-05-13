@@ -51,7 +51,7 @@ jobs:
             fi
           done
 
-      - name: Build deb package
+      - name: Build deb package (standard)
         id: deb
         run: |
           BUNDLE_VER="${{ steps.version.outputs.version }}"
@@ -85,6 +85,41 @@ jobs:
           echo "deb_file=$DEB_FILE" >> "$GITHUB_OUTPUT"
           echo "pkg_dir=$PKG_DIR" >> "$GITHUB_OUTPUT"
 
+      - name: Build deb package (Termux)
+        id: deb_termux
+        run: |
+          BUNDLE_VER="${{ steps.version.outputs.version }}"
+          DEB_VER="${BUNDLE_VER}"
+          ARCH=aarch64
+          PKG_NAME=fortune-hitokoto
+          PKG_DIR="${PKG_NAME}_${DEB_VER}_${ARCH}"
+
+          TERMUX_PREFIX=/data/data/com.termux/files/usr
+
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/${TERMUX_PREFIX}/share/games/fortunes"
+
+          cp fortunes/hitokoto* "${PKG_DIR}/${TERMUX_PREFIX}/share/games/fortunes/"
+
+          cat > "${PKG_DIR}/DEBIAN/control" << EOF
+          Package: ${PKG_NAME}
+          Version: ${DEB_VER}
+          Section: games
+          Priority: optional
+          Architecture: ${ARCH}
+          Depends: fortune
+          Maintainer: hitokoto-fortune <noreply@github.com>
+          Description: Hitokoto (一言) fortune database files (Termux)
+           Fortune data files generated from the hitokoto-osc/sentences-bundle.
+           Contains Chinese quotes from anime, literature, poetry, and more.
+           Designed for Termux on Android. Install with dpkg and run 'fortune hitokoto'.
+          EOF
+
+          dpkg-deb --build "${PKG_DIR}"
+
+          DEB_FILE="${PKG_DIR}.deb"
+          echo "deb_file=$DEB_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Compute checksums
         id: checksums
         run: |
@@ -93,6 +128,12 @@ jobs:
           SIZE=$(stat --format=%s "$DEB_FILE")
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+
+          DEB_TERMUX="${{ steps.deb_termux.outputs.deb_file }}"
+          SHA256_TERMUX=$(sha256sum "$DEB_TERMUX" | cut -d' ' -f1)
+          SIZE_TERMUX=$(stat --format=%s "$DEB_TERMUX")
+          echo "sha256_termux=$SHA256_TERMUX" >> "$GITHUB_OUTPUT"
+          echo "size_termux=$SIZE_TERMUX" >> "$GITHUB_OUTPUT"
 
       - name: Count sentences
         id: count
@@ -114,7 +155,7 @@ jobs:
 
             Categories: 动画, 漫画, 游戏, 文学, 原创, 网络, 其他, 影视, 诗词, 网易云, 哲学, 搞笑
 
-            ### Install
+            ### Install (Debian/Ubuntu)
 
             ```bash
             sudo dpkg -i fortune-hitokoto_${{ steps.version.outputs.version }}_all.deb
@@ -128,9 +169,21 @@ jobs:
             fortune hitokoto-i   # 诗词
             ```
 
-            ### checksums
+            ### Install (Termux on Android)
+
+            ```bash
+            dpkg -i fortune-hitokoto_${{ steps.version.outputs.version }}_aarch64.deb
+            fortune hitokoto
+            ```
+
+            ### checksums (Debian)
             - SHA256: `${{ steps.checksums.outputs.sha256 }}`
             - Size: `${{ steps.checksums.outputs.size }}` bytes
+
+            ### checksums (Termux)
+            - SHA256: `${{ steps.checksums.outputs.sha256_termux }}`
+            - Size: `${{ steps.checksums.outputs.size_termux }}` bytes
           files: |
             ${{ steps.deb.outputs.deb_file }}
+            ${{ steps.deb_termux.outputs.deb_file }}
           fail_on_unmatched_files: true

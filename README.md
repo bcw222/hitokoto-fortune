@@ -4,8 +4,17 @@
 
 ## 安装
 
+### Debian/Ubuntu
+
 ```bash
 sudo dpkg -i fortune-hitokoto_<version>_all.deb
+fortune hitokoto
+```
+
+### Termux (Android)
+
+```bash
+dpkg -i fortune-hitokoto_<version>_aarch64.deb
 fortune hitokoto
 ```
 
@@ -62,7 +71,7 @@ done
 
 ## 自动构建
 
-项目通过 GitHub Actions 自动构建，每周定时从上游数据源更新并发布新的 deb 包到 [Releases](https://github.com/bcw222/hitokoto-fortune/releases)。
+项目通过 GitHub Actions 自动构建，每周定时从上游数据源更新并发布新的 deb 包到 [Releases](https://github.com/bcw222/hitokoto-fortune/releases)，同时提供标准 Debian 包和 Termux 包。
 
 ## 许可证
 
