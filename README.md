@@ -14,7 +14,7 @@ fortune hitokoto
 ### Termux (Android)
 
 ```bash
-dpkg -i fortune-hitokoto_<version>_aarch64.deb
+dpkg -i fortune-hitokoto-termux_<version>_all.deb
 fortune hitokoto
 ```
 

@@ -90,8 +90,8 @@ jobs:
         run: |
           BUNDLE_VER="${{ steps.version.outputs.version }}"
           DEB_VER="${BUNDLE_VER}"
-          ARCH=aarch64
-          PKG_NAME=fortune-hitokoto
+          ARCH=all
+          PKG_NAME=fortune-hitokoto-termux
           PKG_DIR="${PKG_NAME}_${DEB_VER}_${ARCH}"
 
           TERMUX_PREFIX=/data/data/com.termux/files/usr
@@ -172,7 +172,7 @@ jobs:
             ### Install (Termux on Android)
 
             ```bash
-            dpkg -i fortune-hitokoto_${{ steps.version.outputs.version }}_aarch64.deb
+            dpkg -i fortune-hitokoto-termux_${{ steps.version.outputs.version }}_all.deb
             fortune hitokoto
             ```
 
